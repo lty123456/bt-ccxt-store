@@ -24,11 +24,12 @@ from __future__ import (absolute_import, division, print_function,
 
 import time
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import backtrader as bt
 from backtrader.feed import DataBase
 from backtrader.utils.py3 import with_metaclass
+from dateutil.relativedelta import relativedelta
 
 from .ccxtstore import CCXTStore
 
@@ -129,9 +130,42 @@ class CCXTFeed(with_metaclass(MetaCCXTFeed, DataBase)):
                         self._state = self._ST_LIVE
                         self.put_notification(self.LIVE)
                         continue
+                    
+    def _calculate_next_kline_time(self):
+        if self._last_ts <= 0:
+            return 0
+    
+        last_dt = datetime.utcfromtimestamp(self._last_ts / 1000)
+    
+        if self._timeframe == bt.TimeFrame.Seconds:
+            next_dt = last_dt + timedelta(seconds=self._compression * 2)
+        elif self._timeframe == bt.TimeFrame.Minutes:
+            next_dt = last_dt + timedelta(minutes=self._compression * 2)
+        elif self._timeframe == bt.TimeFrame.Days:
+            next_dt = last_dt + timedelta(days=self._compression * 2)
+        elif self._timeframe == bt.TimeFrame.Weeks:
+            next_dt = last_dt + timedelta(weeks=self._compression * 2)
+        elif self._timeframe == bt.TimeFrame.Months:
+            next_dt = last_dt + relativedelta(months=self._compression * 2)
+        elif self._timeframe == bt.TimeFrame.Years:
+            next_dt = last_dt + relativedelta(years=self._compression * 2)
+        else:
+            raise ValueError("Unsupported timeframe")
+    
+        return int(next_dt.timestamp() * 1000)
 
     def _fetch_ohlcv(self, fromdate=None):
         """Fetch OHLCV data into self._data queue"""
+        next_kline_time = self._calculate_next_kline_time()
+        current_utc_ms = int(time.time() * 1000)
+        if current_utc_ms < next_kline_time:
+            if self.p.debug:
+                next_kline_dt = datetime.utcfromtimestamp(next_kline_time // 1000)
+                current_dt = datetime.utcfromtimestamp(current_utc_ms // 1000)
+                print('{} - Skipping request: current time {} < next kline time {}'.format(
+                    datetime.utcnow(), current_dt, next_kline_dt))
+            return
+        
         granularity = self.store.get_granularity(self._timeframe, self._compression)
 
         if fromdate:
