@@ -24,7 +24,7 @@ from __future__ import (absolute_import, division, print_function,
 
 import time
 from collections import deque
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import backtrader as bt
 from backtrader.feed import DataBase
@@ -135,24 +135,24 @@ class CCXTFeed(with_metaclass(MetaCCXTFeed, DataBase)):
         if self._last_ts <= 0:
             return 0
     
-        last_dt = datetime.utcfromtimestamp(self._last_ts / 1000)
+        last_ts_ms = int(self._last_ts)
     
         if self._timeframe == bt.TimeFrame.Seconds:
-            next_dt = last_dt + timedelta(seconds=self._compression * 2)
+            delta_ms = self._compression * 2 * 1000 + 100
         elif self._timeframe == bt.TimeFrame.Minutes:
-            next_dt = last_dt + timedelta(minutes=self._compression * 2)
+            delta_ms = self._compression * 2 * 60 * 1000 + 1000
         elif self._timeframe == bt.TimeFrame.Days:
-            next_dt = last_dt + timedelta(days=self._compression * 2)
+            delta_ms = self._compression * 2 * 24 * 60 * 60 * 1000 + 1000
         elif self._timeframe == bt.TimeFrame.Weeks:
-            next_dt = last_dt + timedelta(weeks=self._compression * 2)
-        elif self._timeframe == bt.TimeFrame.Months:
-            next_dt = last_dt + relativedelta(months=self._compression * 2)
-        elif self._timeframe == bt.TimeFrame.Years:
-            next_dt = last_dt + relativedelta(years=self._compression * 2)
+            delta_ms = self._compression * 2 * 7 * 24 * 60 * 60 * 1000 + 1000
+        # elif self._timeframe == bt.TimeFrame.Months:
+        #     return 0
+        # elif self._timeframe == bt.TimeFrame.Years:
+        #     return 0
         else:
             raise ValueError("Unsupported timeframe")
     
-        return int(next_dt.timestamp() * 1000)
+        return last_ts_ms + delta_ms
 
     def _fetch_ohlcv(self, fromdate=None):
         """Fetch OHLCV data into self._data queue"""
