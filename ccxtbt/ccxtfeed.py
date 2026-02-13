@@ -229,7 +229,7 @@ class CCXTFeed(with_metaclass(MetaCCXTFeed, DataBase)):
                     self._data.append(ohlcv)
                     self._last_ts = tstamp
 
-            if dlen == len(self._data):
+            if dlen <= len(self._data):
                 break
 
     def _load_ticks(self):
